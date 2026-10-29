@@ -44,18 +44,20 @@ form.send{display:flex;gap:.5rem;padding:.8rem}form.send input{border-radius:99p
 .err{color:#c0392b}.soon{color:var(--mut)}
 @media(max-width:1100px){#cols{grid-template-columns:320px 1fr}#rp{display:none}}
 @media(max-width:700px){#cols{grid-template-columns:1fr;padding:.5rem}#app.chatting aside{display:none}#app:not(.chatting) main{display:none}nav,.me b{display:none}#back{display:inline-block}}
-#callui{position:fixed;inset:0;background:#000;z-index:9}#rv{width:100%;height:100%;object-fit:cover}
-#lv{position:absolute;right:1rem;top:1rem;width:140px;border-radius:12px;background:#222}
-#cinfo{position:absolute;top:1rem;left:1rem;display:flex;gap:.6rem;text-shadow:0 0 6px #000}
-#cctl{position:absolute;bottom:1.5rem;left:0;right:0;display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
-#incoming{position:fixed;top:1rem;left:50%;transform:translateX(-50%);background:var(--bg2);padding:1rem;border-radius:16px;z-index:10;display:grid;gap:.6rem;border:1px solid var(--pri)}
-.bad{background:#c0392b}
-.bad,.bad:hover{background:#c0392b;color:#fff}#incoming{color:var(--tx)}
+#callui{position:fixed;inset:0;background:radial-gradient(circle at top,#1d2b1d,#090c0b 58%,#070909);z-index:35;overflow:hidden;display:grid;place-items:center}#rv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#090b0a;filter:saturate(1.1)}
+#lv{position:absolute;right:1rem;bottom:6.5rem;width:120px;height:170px;object-fit:cover;border:2px solid rgba(255,255,255,.12);border-radius:18px;background:#111;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+#cinfo{position:absolute;top:1.2rem;left:1.2rem;display:flex;flex-direction:column;gap:.15rem;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.7);z-index:2}
+#cinfo small{opacity:.85;letter-spacing:.02em}#cinfo b{font-size:1.4rem;line-height:1.2}
+#cctl{position:absolute;bottom:1.4rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:.8rem;flex-wrap:wrap;padding:0 1rem;z-index:2}
+#incoming{position:fixed;inset:0;background:rgba(6,9,7,.86);backdrop-filter:blur(8px);z-index:40;display:grid;place-items:center;gap:1rem;color:#fff;padding:1.4rem}.bad{background:#c0392b}.bad,.bad:hover{background:#c0392b;color:#fff}
+#incoming b{display:block;font-size:clamp(1.8rem,5vw,3rem);text-align:center;letter-spacing:-.04em;max-width:520px}
+#incoming .call-actions{display:flex;gap:1rem;justify-content:center;align-items:center}
+#incoming .call-actions button{min-width:140px;padding:1rem 1.4rem;border-radius:999px;font-size:1rem;box-shadow:0 12px 28px rgba(0,0,0,.25)}
+#acc{background:linear-gradient(180deg,#38c877,#1fa65a)}#acc:hover{background:linear-gradient(180deg,#42d784,#22b961)}
+#rej{background:linear-gradient(180deg,#fb5f65,#d73442)}#rej:hover{background:linear-gradient(180deg,#ff727a,#e13d4c)}
 .me{position:relative}#menu{position:absolute;right:0;top:48px;background:var(--card);padding:.4rem;border-radius:14px;box-shadow:0 6px 20px #0003;display:grid;gap:.3rem;z-index:5;min-width:140px}
-#lv{right:1rem;bottom:8.5rem;top:auto;width:110px;height:150px;object-fit:cover;border:2px solid #fff6;border-radius:16px}
-#cinfo{flex-direction:column;gap:0;color:#fff}#cinfo small{opacity:.85}#cinfo b{font-size:1.2rem}
-.cb{display:grid;justify-items:center;gap:.3rem;background:none;box-shadow:none;padding:0;color:#fff;font-size:.75rem}.cb:hover,.cb.bad,.cb.bad:hover{background:none}
-.cb i{font-style:normal;width:54px;height:54px;border-radius:50%;background:#ffffff2e;display:grid;place-items:center;font-size:1.4rem}.cb.bad i{background:#e53b4f}
+.cb{display:grid;justify-items:center;gap:.45rem;background:rgba(255,255,255,.08);box-shadow:0 8px 20px rgba(0,0,0,.18);padding:0;color:#fff;font-size:.72rem;border-radius:50%;width:64px;height:64px;backdrop-filter:blur(8px)}.cb:hover,.cb.bad,.cb.bad:hover{background:rgba(255,255,255,.12)}
+.cb i{font-style:normal;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:1.4rem}.cb.bad i{background:rgba(229,59,79,.24)}
 #gcall{position:fixed;inset:0;background:#10140f;z-index:9;color:#fff}#ginfo{position:absolute;top:1rem;left:1rem;display:grid;z-index:2}
 #grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;padding:4rem .6rem 8rem;height:100%}#grid[data-n="1"]{grid-template-columns:1fr}
 .tile{position:relative;background:#000;border-radius:16px;overflow:hidden;min-height:0}.tile video{width:100%;height:100%;object-fit:cover}
@@ -345,69 +347,196 @@ $("send").onsubmit=async e=>{e.preventDefault();const text=$("text").value.trim(
  catch(err){$("text").value=text;toast("Message failed to send: "+err.code)}};
 
 /* ===== WebRTC calls (signaling via Realtime Database) ===== */
-const ICE=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"},{urls:"stun:global.stun.twilio.com:3478"},{urls:["turn:openrelay.metered.ca:80","turn:openrelay.metered.ca:443","turn:openrelay.metered.ca:443?transport=tcp"],username:"openrelayproject",credential:"openrelayproject"}]; // last entry = free shared TURN relay (fallback for mobile data); use your own TURN_ENDPOINT for production
-const TURN_ENDPOINT=""; // optional: your backend URL returning {iceServers:[...]} with temporary TURN credentials
+const ICE=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"},{urls:"stun:stun.cloudflare.com:3478"},{urls:"stun:global.stun.twilio.com:3478"}];
+async function iceServers(){return [...ICE]}
 let call=null,inc=null,peer=null;
-async function iceServers(){if(!TURN_ENDPOINT)return ICE;try{const r=await fetch(TURN_ENDPOINT,{headers:{Authorization:"Bearer "+await auth.currentUser.getIdToken()}});return [...ICE,...(await r.json()).iceServers]}catch{return ICE}}
+const callStateLabels={idle:"Idle",ringing:"Ringing",connecting:"Connecting",connected:"Connected",ended:"Ended",rejected:"Rejected",missed:"Missed",busy:"Busy",failed:"Failed",cancelled:"Cancelled",disconnected:"Disconnected"};
+function safeRemoveDb(path){if(!path)return Promise.resolve();return remove(ref(rtdb,path)).catch(()=>{})}
+function clearCallTimers(){if(!call)return;clearTimeout(call.to);clearInterval(call.tick);call.to=null;call.tick=null}
+function stopStreamTracks(stream){if(!stream)return;stream.getTracks().forEach(track=>track.stop())}
+function formatCallDurationFromMs(ms){const total=Math.max(0,Math.floor(ms/1000));return `${String(Math.floor(total/60)).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`}
+function beginCallTimer(){if(!call||call.t0)return;call.tick=setInterval(()=>{const total=Math.max(0,Math.floor((Date.now()-call.t0)/1000));$("cdur").textContent=formatCallDurationFromMs(total*1000);},1000)}
+function openCallUi(name,st,video){$("callui").hidden=false;$("cname").textContent=name;$("ctype").textContent=video?"Video Call":"Voice Call";$("cstat").textContent="Connecting…";$("cdur").textContent="00:00";$("lv").srcObject=st;$("lv").hidden=!video;$("c-cam").hidden=!video;$("c-pip").hidden=!video;$("c-mute").querySelector("span").textContent="Mic On";$("c-cam").querySelector("span").textContent="Camera On"}
+function updateCallStateOnDb(id,state,data={}){if(!id)return Promise.resolve();return update(ref(rtdb,`calls/${id}`),{state,updatedAt:rts(),...data}).catch(()=>{})}
+function endCall(msg,notify=true,finalState="ended"){
+ if(!call){return}
+ const c=call;if(c.ending)return;c.ending=true;call=null;clearCallTimers();
+ logCall(c,msg || (finalState==="missed"?"No answer.":finalState==="rejected"?"Call rejected.":finalState==="failed"?"Connection failed.":"Call ended."));
+ c.unsubs.forEach(f=>f&&f());c.pc?.close();stopStreamTracks(c.stream);$("rv").srcObject=null;$("lv").srcObject=null;$("callui").hidden=true;
+ if(document.pictureInPictureElement)document.exitPictureInPicture().catch(()=>{});
+ if(c.role==="caller")safeRemoveDb(`incoming/${c.other}`).catch(()=>{});
+ if(notify&&c.id){update(ref(rtdb,`calls/${c.id}`),{state:finalState,endedAt:rts()}).catch(()=>{});setTimeout(()=>safeRemoveDb(`calls/${c.id}`),5000)}
+ if(msg)toast(msg)
+}
 async function media(video){
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast(isSecureContext?"This browser can't use mic/camera. Open ARA in Chrome or Safari.":"Mic/camera need HTTPS.");return null}
  const tries=video?[{audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:480}}},{audio:true,video:true},{audio:true}]:[{audio:true}];
- let err;for(let i=0;i<tries.length;i++){try{const st=await navigator.mediaDevices.getUserMedia(tries[i]);
-   if(video&&i===tries.length-1)toast("Camera not available, using audio only.");return st}
-  catch(e){err=e;if(e.name==="NotAllowedError"||e.name==="SecurityError")break}}
+ let err;for(let i=0;i<tries.length;i++){try{const st=await navigator.mediaDevices.getUserMedia(tries[i]);if(video&&i===tries.length-1)toast("Camera not available, using audio only.");return st}
+ catch(e){err=e;if(e.name==="NotAllowedError"||e.name==="SecurityError")break}}
  const n=err&&err.name;toast(n==="NotAllowedError"||n==="SecurityError"?"Permission denied. Allow microphone/camera in your browser site settings.":n==="NotFoundError"?"No microphone found on this device.":n==="NotReadableError"?"Mic/camera is being used by another app. Close it and retry.":"Cannot access mic/camera: "+n);return null}
-function openCallUi(name,st,video){$("callui").hidden=false;$("cname").textContent=name;$("ctype").textContent=video?"Video Call":"Voice Call";$("cstat").textContent="connecting…";$("cdur").textContent="00:00";
- $("lv").srcObject=st;$("lv").hidden=!video;$("c-cam").hidden=!video;$("c-pip").hidden=!video}
+}
 function setupPc(id,side){
- const pc=new RTCPeerConnection({iceServers:call.ice});call.pc=pc;const pend=[];call.addIce=c=>pc.remoteDescription?pc.addIceCandidate(c).catch(()=>{}):pend.push(c);call.flush=()=>pend.splice(0).forEach(c=>pc.addIceCandidate(c).catch(()=>{}));
- call.stream.getTracks().forEach(t=>pc.addTrack(t,call.stream));
- pc.ontrack=e=>{$("rv").srcObject=e.streams[0]||new MediaStream([e.track]);$("rv").play?.().catch(()=>{})};
- pc.onicecandidate=e=>e.candidate&&push(ref(rtdb,`calls/${id}/ice/${side}`),e.candidate.toJSON());
- pc.onconnectionstatechange=()=>{const s=pc.connectionState;if(!call)return;$("cstat").textContent=s;
-  if(s==="connected"&&!call.t0){call.t0=Date.now();call.tick=setInterval(()=>{const n=Math.floor((Date.now()-call.t0)/1e3);$("cdur").textContent=String(n/60|0).padStart(2,"0")+":"+String(n%60).padStart(2,"0")},1000)}
-  if(s==="failed")endCall("Connection failed (a TURN server may be needed).",true)};
- call.unsubs.push(onChildAdded(ref(rtdb,`calls/${id}/ice/${side==="caller"?"callee":"caller"}`),s=>call?.addIce(s.val())));
- call.unsubs.push(onValue(ref(rtdb,`calls/${id}/state`),s=>{const v=s.val();
-  if(["rejected","ended","missed"].includes(v))endCall(v==="rejected"?"Call rejected.":v==="missed"?"No answer.":"Call ended.",false)}));
+ const pc=new RTCPeerConnection({iceServers:ICE,iceCandidatePoolSize:0});
+ const queue=[];call.pc=pc;call.queuedCandidates=queue;call.flushICE=()=>{if(!pc.remoteDescription||!queue.length)return;const next=queue.splice(0);next.forEach(candidate=>{if(!candidate)return;pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{})})};
+ call.stream.getTracks().forEach(track=>pc.addTrack(track,call.stream));
+ pc.ontrack=e=>{const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([e.track]);$("rv").srcObject=stream;$("rv").muted=false;$("rv").autoplay=true;$("rv").playsInline=true;$("rv").play?.().catch(()=>{})};
+ pc.onicecandidate=e=>{if(!e.candidate||!call||call.id!==id)return;const refI=push(ref(rtdb,`calls/${id}/ice/${side}`));set(refI,e.candidate.toJSON()).catch(()=>{})};
+ pc.onconnectionstatechange=()=>{const s=pc.connectionState;if(!call||call.id!==id)return;const label=callStateLabels[s]||s;$("cstat").textContent=label;
+  if(s==="connecting"||s==="checking"){updateCallStateOnDb(id,"connecting").catch(()=>{})}
+  if(s==="connected"){if(!call.t0){call.t0=Date.now();beginCallTimer();}updateCallStateOnDb(id,"connected").catch(()=>{})}
+  if(s==="failed"||s==="disconnected"||s==="closed"){endCall("Connection lost. Direct P2P could not stay stable on this network.",true,"disconnected");}
+ };
+ const remoteSide=side==="caller"?"callee":"caller";
+ call.unsubs.push(onChildAdded(ref(rtdb,`calls/${id}/ice/${remoteSide}`),s=>{const candidate=s.val();if(!candidate)return;if(pc.remoteDescription){pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{})}else{queue.push(candidate)}}));
+ call.unsubs.push(onValue(ref(rtdb,`calls/${id}/state`),s=>{const v=s.val();if(!v||!["rejected","ended","missed","busy","failed","cancelled","disconnected"].includes(v))return;const reason=v==="rejected"?"Call rejected.":v==="missed"?"No answer.":v==="busy"?"User is busy.":v==="cancelled"?"Call cancelled.":v==="disconnected"?"Connection lost.":"Call ended.";endCall(reason,false,v)}));
 }
 async function startCall(video){
- if(!peer)return toast("Open a conversation first.");if(blocked.has(peer.uid))return toast("You blocked this user. Unblock to call.");if(call)return;if(!navigator.onLine)return toast("You are offline.");
- const st=await media(video);if(!st)return;video=video&&st.getVideoTracks().length>0;
- const id=push(ref(rtdb,"calls")).key;call={id,video,stream:st,unsubs:[],ice:await iceServers(),role:"caller",other:peer.uid};
- openCallUi(peer.nickname,st,video);setupPc(id,"caller");const pc=call.pc;
- await pc.setLocalDescription(await pc.createOffer());
- try{await set(ref(rtdb,`calls/${id}`),{from:me.uid,to:peer.uid,video,state:"ringing",offer:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
-  await set(ref(rtdb,`incoming/${peer.uid}`),{callId:id,from:me.uid,video,name:me.nickname})}
- catch(e){return endCall("Could not start call: "+e.code,false)}
- call.unsubs.push(onValue(ref(rtdb,`calls/${id}/answer`),async s=>{const a=s.val();if(a&&!pc.currentRemoteDescription){await pc.setRemoteDescription(a);call?.flush()}}));
- call.to=setTimeout(()=>{if(!call?.t0)update(ref(rtdb,`calls/${id}`),{state:"missed"})},30000)}
-function listenIncoming(){onValue(ref(rtdb,`incoming/${me.uid}`),s=>{const v=s.val();
- if(!v){$("incoming").hidden=true;if(inc&&!inc.handled)logIn(inc,"missed");inc=null;return}
- if(call){update(ref(rtdb,`calls/${v.callId}`),{state:"rejected"});return}
- inc=v;$("inc-name").textContent=`${v.name} is ${v.video?"video":"voice"} calling…`;$("incoming").hidden=false})}
-$("acc").onclick=async()=>{const v=inc;if(!v)return;v.handled=true;$("incoming").hidden=true;
- const c=(await get(ref(rtdb,`calls/${v.callId}`))).val();
- if(!c||c.state!=="ringing"){remove(ref(rtdb,`incoming/${me.uid}`));return toast("Call is no longer available.")}
- const st=await media(v.video);
- if(!st){update(ref(rtdb,`calls/${v.callId}`),{state:"rejected"});remove(ref(rtdb,`incoming/${me.uid}`));return}
- call={id:v.callId,video:v.video,stream:st,unsubs:[],ice:await iceServers(),role:"callee",other:v.from};
- openCallUi(v.name,st,v.video);setupPc(v.callId,"callee");const pc=call.pc;
- try{await pc.setRemoteDescription(c.offer);call?.flush();await pc.setLocalDescription(await pc.createAnswer());
-  await update(ref(rtdb,`calls/${v.callId}`),{answer:{type:pc.localDescription.type,sdp:pc.localDescription.sdp},state:"active"})}
- catch(e){endCall("Call setup failed: "+(e.code||e.name),true)}
- remove(ref(rtdb,`incoming/${me.uid}`))};
-$("rej").onclick=()=>{if(!inc)return;inc.handled=true;logIn(inc,"declined");update(ref(rtdb,`calls/${inc.callId}`),{state:"rejected"});remove(ref(rtdb,`incoming/${me.uid}`))};
-function endCall(msg,notify=true){if(!call)return;const c=call;call=null;logCall(c,msg);
- clearTimeout(c.to);clearInterval(c.tick);c.unsubs.forEach(f=>f());c.pc?.close();c.stream.getTracks().forEach(t=>t.stop());
- $("rv").srcObject=null;$("lv").srcObject=null;$("callui").hidden=true;
- if(document.pictureInPictureElement)document.exitPictureInPicture().catch(()=>{});
- if(notify)update(ref(rtdb,`calls/${c.id}`),{state:"ended"}).catch(()=>{});
- if(c.role==="caller"){remove(ref(rtdb,`incoming/${c.other}`)).catch(()=>{});setTimeout(()=>remove(ref(rtdb,`calls/${c.id}`)).catch(()=>{}),5000)}
- if(msg)toast(msg)}
-$("call-a").onclick=()=>startCall(false);$("call-v").onclick=()=>startCall(true);
-$("c-end").onclick=()=>endCall("",true);
-$("c-mute").onclick=e=>{const t=call?.stream.getAudioTracks();t?.forEach(x=>x.enabled=!x.enabled);e.currentTarget.querySelector("span").textContent=t?.[0]?.enabled?"Mic On":"Mic Off"};
-$("c-cam").onclick=e=>{const t=call?.stream.getVideoTracks();t?.forEach(x=>x.enabled=!x.enabled);e.currentTarget.querySelector("span").textContent=t?.[0]?.enabled?"Camera On":"Camera Off"};
+  if(!peer)return toast("Open a conversation first.");
+  if(blocked.has(peer.uid))return toast("You blocked this user. Unblock to call.");
+  if(call||inc)return toast("A call is already in progress.");
+  if(!navigator.onLine)return toast("You are offline.");
+
+  const st=await media(video);
+  if(!st)return;
+  video=video&&st.getVideoTracks().length>0;
+
+  const id=push(ref(rtdb,"calls")).key;
+  if(!id)return toast("Could not create a new call.");
+
+  call={id,video,stream:st,unsubs:[],role:"caller",other:peer.uid,t0:0};
+  openCallUi(peer.nickname,st,video);
+  setupPc(id,"caller");
+  const pc=call.pc;
+
+  await pc.setLocalDescription(await pc.createOffer());
+
+  try {
+    await set(ref(rtdb,`calls/${id}`),{
+      from:me.uid,
+      to:peer.uid,
+      video,
+      state:"ringing",
+      offer:{type:pc.localDescription.type,sdp:pc.localDescription.sdp},
+      createdAt:rts()
+    });
+    await set(ref(rtdb,`incoming/${peer.uid}`),{
+      callId:id,
+      from:me.uid,
+      video,
+      name:me.nickname,
+      state:"ringing",
+      createdAt:rts()
+    });
+  } catch (e) {
+    return endCall("Could not start call: "+(e.code||e.message),false,"failed");
+  }
+
+  call.unsubs.push(onValue(ref(rtdb,`calls/${id}/answer`),async s=>{
+    const answer=s.val();
+    if(!answer||!call||pc.remoteDescription)return;
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      call.flushICE();
+    } catch (error) {
+      endCall("Answer setup failed.",true,"failed");
+    }
+  }));
+
+  call.to=setTimeout(()=>{
+    if(call&&call.role==="caller"&&!call.t0){
+      update(ref(rtdb,`calls/${id}`),{state:"missed",endedAt:rts()}).catch(()=>{});
+      endCall("No answer.",false,"missed");
+    }
+  },30000);
+}
+
+function listenIncoming(){
+  onValue(ref(rtdb,`incoming/${me.uid}`),async s=>{
+    const v=s.val();
+    if(!v){
+      if(inc&&!inc.handled)logIn(inc,"missed");
+      inc=null;
+      $("incoming").hidden=true;
+      return;
+    }
+    if(!v.callId||v.from===me.uid)return;
+    if(call){
+      safeRemoveDb(`incoming/${me.uid}`).catch(()=>{});
+      update(ref(rtdb,`calls/${v.callId}`),{state:"busy",endedAt:rts()}).catch(()=>{});
+      return;
+    }
+    const c=(await get(ref(rtdb,`calls/${v.callId}`))).val();
+    if(c&&["rejected","ended","missed","cancelled","failed","disconnected"].includes(c.state)){
+      safeRemoveDb(`incoming/${me.uid}`).catch(()=>{});
+      return;
+    }
+    inc={...v,handled:false};
+    $("inc-name").textContent=`${v.name} is ${v.video?"video":"voice"} calling…`;
+    $("incoming").hidden=false;
+  });
+}
+
+$("acc").onclick=async()=>{
+  const v=inc;
+  if(!v)return;
+  v.handled=true;
+  $("incoming").hidden=true;
+
+  const c=(await get(ref(rtdb,`calls/${v.callId}`))).val();
+  if(!c||!c.offer||["rejected","ended","missed","cancelled","failed","disconnected"].includes(c.state)){
+    safeRemoveDb(`incoming/${me.uid}`).catch(()=>{});
+    return toast("Call is no longer available.");
+  }
+
+  const st=await media(v.video);
+  if(!st){
+    await update(ref(rtdb,`calls/${v.callId}`),{state:"rejected",endedAt:rts()});
+    safeRemoveDb(`incoming/${me.uid}`).catch(()=>{});
+    return;
+  }
+
+  call={id:v.callId,video:v.video,stream:st,unsubs:[],role:"callee",other:v.from,t0:0};
+  openCallUi(v.name,st,v.video);
+  setupPc(v.callId,"callee");
+  const pc=call.pc;
+
+  try {
+    await pc.setRemoteDescription(new RTCSessionDescription(c.offer));
+    call.flushICE();
+    await pc.setLocalDescription(await pc.createAnswer());
+    await update(ref(rtdb,`calls/${v.callId}`),{
+      answer:{type:pc.localDescription.type,sdp:pc.localDescription.sdp},
+      state:"connecting",
+      updatedAt:rts()
+    });
+    safeRemoveDb(`incoming/${me.uid}`).catch(()=>{});
+  } catch (e) {
+    endCall("Call setup failed: "+(e.code||e.name),true,"failed");
+  }
+};
+
+$("rej").onclick=()=>{
+  if(!inc)return;
+  inc.handled=true;
+  logIn(inc,"declined");
+  update(ref(rtdb,`calls/${inc.callId}`),{state:"rejected",endedAt:rts()}).catch(()=>{});
+  safeRemoveDb(`incoming/${me.uid}`).catch(()=>{});
+  $("incoming").hidden=true;
+};
+
+$("call-a").onclick=()=>startCall(false);
+$("call-v").onclick=()=>startCall(true);
+$("c-end").onclick=()=>endCall("Call ended.",true,"ended");
+$("c-mute").onclick=e=>{
+  const tracks=call?.stream.getAudioTracks();
+  tracks?.forEach(track=>track.enabled=!track.enabled);
+  e.currentTarget.querySelector("span").textContent=tracks?.[0]?.enabled?"Mic On":"Mic Off";
+};
+$("c-cam").onclick=e=>{
+  const tracks=call?.stream.getVideoTracks();
+  tracks?.forEach(track=>track.enabled=!track.enabled);
+  e.currentTarget.querySelector("span").textContent=tracks?.[0]?.enabled?"Camera On":"Camera Off";
+};
 $("c-fs").onclick=()=>$("callui").requestFullscreen?.().catch(()=>{});
 $("c-pip").onclick=()=>$("rv").requestPictureInPicture?.().catch(()=>toast("Picture-in-Picture not supported here."));
 

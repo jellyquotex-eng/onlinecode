@@ -287,6 +287,26 @@ $("rp-t").onclick=()=>{LS.set("ara-rp",LS.get("ara-rp")==="0"?"1":"0");applyRp()
 document.querySelectorAll("nav a").forEach(a=>a.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();a.click()}}));
 let me,activeCid,unsub=[],cache={},started=false,lastSnap=null,clr=0,renderMsgs=()=>{};
 const getUser=async uid=>cache[uid]||(cache[uid]=(await getDoc(doc(db,"users",uid))).data());
+function isTypingTarget(target){
+  if(!target) return false;
+  if(target.isContentEditable) return true;
+  const tag = target.tagName && target.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select";
+}
+let lastPKeyPress = 0;
+function requestAdminPanelShortcut(event){
+  if(!event || event.defaultPrevented) return;
+  if(event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing) return;
+  if(isTypingTarget(event.target)) return;
+  if(event.key && event.key.toLowerCase() === "p" && !event.repeat){
+    const now = Date.now();
+    if(now - lastPKeyPress < 500){
+      openAdminPanel();
+    }
+    lastPKeyPress = now;
+  }
+}
+document.addEventListener("keydown", requestAdminPanelShortcut);
 async function refreshAdminAccessUI(){
   const adminButton = $("menu-admin");
   if(!adminButton) return;
@@ -300,7 +320,7 @@ async function refreshAdminAccessUI(){
   }
 }
 
-$("menu-admin").onclick = () => openAdminPanel();
+$("menu-admin").onclick = openAdminPanel;
 
 $("gbtn").onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider())}
  catch(e){toast(e.code==="auth/popup-closed-by-user"?"Login cancelled.":"Google login failed: "+e.code)}};

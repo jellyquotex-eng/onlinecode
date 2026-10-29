@@ -348,48 +348,88 @@ $("send").onsubmit=async e=>{e.preventDefault();const text=$("text").value.trim(
 
 /* ===== WebRTC calls (signaling via Realtime Database) ===== */
 const ICE=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"},{urls:"stun:stun.cloudflare.com:3478"},{urls:"stun:global.stun.twilio.com:3478"}];
-async function iceServers(){return [...ICE]}
 let call=null,inc=null,peer=null;
 const callStateLabels={idle:"Idle",ringing:"Ringing",connecting:"Connecting",connected:"Connected",ended:"Ended",rejected:"Rejected",missed:"Missed",busy:"Busy",failed:"Failed",cancelled:"Cancelled",disconnected:"Disconnected"};
+
 function safeRemoveDb(path){if(!path)return Promise.resolve();return remove(ref(rtdb,path)).catch(()=>{})}
 function clearCallTimers(){if(!call)return;clearTimeout(call.to);clearInterval(call.tick);call.to=null;call.tick=null}
 function stopStreamTracks(stream){if(!stream)return;stream.getTracks().forEach(track=>track.stop())}
 function formatCallDurationFromMs(ms){const total=Math.max(0,Math.floor(ms/1000));return `${String(Math.floor(total/60)).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`}
 function beginCallTimer(){if(!call||call.t0)return;call.tick=setInterval(()=>{const total=Math.max(0,Math.floor((Date.now()-call.t0)/1000));$("cdur").textContent=formatCallDurationFromMs(total*1000);},1000)}
-function openCallUi(name,st,video){$("callui").hidden=false;$("cname").textContent=name;$("ctype").textContent=video?"Video Call":"Voice Call";$("cstat").textContent="Connecting…";$("cdur").textContent="00:00";$("lv").srcObject=st;$("lv").hidden=!video;$("c-cam").hidden=!video;$("c-pip").hidden=!video;$("c-mute").querySelector("span").textContent="Mic On";$("c-cam").querySelector("span").textContent="Camera On"}
+
+function openCallUi(name,st,video){
+  $("callui").hidden=false;
+  $("cname").textContent=name;
+  $("ctype").textContent=video?"Video Call":"Voice Call";
+  $("cstat").textContent="Connecting…";
+  $("cdur").textContent="00:00";
+  $("lv").srcObject=st;
+  $("lv").hidden=!video;
+  $("c-cam").hidden=!video;
+  $("c-pip").hidden=!video;
+  $("c-mute").querySelector("span").textContent="Mic On";
+  $("c-cam").querySelector("span").textContent="Camera On";
+}
+
 function updateCallStateOnDb(id,state,data={}){if(!id)return Promise.resolve();return update(ref(rtdb,`calls/${id}`),{state,updatedAt:rts(),...data}).catch(()=>{})}
 function endCall(msg,notify=true,finalState="ended"){
- if(!call){return}
- const c=call;if(c.ending)return;c.ending=true;call=null;clearCallTimers();
- logCall(c,msg || (finalState==="missed"?"No answer.":finalState==="rejected"?"Call rejected.":finalState==="failed"?"Connection failed.":"Call ended."));
- c.unsubs.forEach(f=>f&&f());c.pc?.close();stopStreamTracks(c.stream);$("rv").srcObject=null;$("lv").srcObject=null;$("callui").hidden=true;
- if(document.pictureInPictureElement)document.exitPictureInPicture().catch(()=>{});
- if(c.role==="caller")safeRemoveDb(`incoming/${c.other}`).catch(()=>{});
- if(notify&&c.id){update(ref(rtdb,`calls/${c.id}`),{state:finalState,endedAt:rts()}).catch(()=>{});setTimeout(()=>safeRemoveDb(`calls/${c.id}`),5000)}
- if(msg)toast(msg)
+  if(!call)return;
+  const c=call;
+  if(c.ending)return;
+  c.ending=true;
+  call=null;
+  clearCallTimers();
+  logCall(c,msg || (finalState==="missed"?"No answer.":finalState==="rejected"?"Call rejected.":finalState==="failed"?"Connection failed.":"Call ended."));
+  c.unsubs.forEach(f=>f&&f());
+  c.pc?.close();
+  stopStreamTracks(c.stream);
+  $("rv").srcObject=null;
+  $("lv").srcObject=null;
+  $("callui").hidden=true;
+  if(document.pictureInPictureElement)document.exitPictureInPicture().catch(()=>{});
+  if(c.role==="caller")safeRemoveDb(`incoming/${c.other}`).catch(()=>{});
+  if(notify&&c.id){update(ref(rtdb,`calls/${c.id}`),{state:finalState,endedAt:rts()}).catch(()=>{});setTimeout(()=>safeRemoveDb(`calls/${c.id}`),5000)}
+  if(msg)toast(msg);
 }
+
 async function media(video){
- if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast(isSecureContext?"This browser can't use mic/camera. Open ARA in Chrome or Safari.":"Mic/camera need HTTPS.");return null}
- const tries=video?[{audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:480}}},{audio:true,video:true},{audio:true}]:[{audio:true}];
- let err;for(let i=0;i<tries.length;i++){try{const st=await navigator.mediaDevices.getUserMedia(tries[i]);if(video&&i===tries.length-1)toast("Camera not available, using audio only.");return st}
- catch(e){err=e;if(e.name==="NotAllowedError"||e.name==="SecurityError")break}}
- const n=err&&err.name;toast(n==="NotAllowedError"||n==="SecurityError"?"Permission denied. Allow microphone/camera in your browser site settings.":n==="NotFoundError"?"No microphone found on this device.":n==="NotReadableError"?"Mic/camera is being used by another app. Close it and retry.":"Cannot access mic/camera: "+n);return null}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast(isSecureContext?"This browser can't use mic/camera. Open ARA in Chrome or Safari.":"Mic/camera need HTTPS.");return null}
+  const tries=video?[{audio:true,video:{facingMode:"user",width:{ideal:640},height:{ideal:480}}},{audio:true,video:true},{audio:true}]:[{audio:true}];
+  let err;
+  for(let i=0;i<tries.length;i++){
+    try{
+      const st=await navigator.mediaDevices.getUserMedia(tries[i]);
+      if(video&&i===tries.length-1)toast("Camera not available, using audio only.");
+      return st;
+    } catch(e){
+      err=e;
+      if(e.name==="NotAllowedError"||e.name==="SecurityError")break;
+    }
+  }
+  const n=err&&err.name;
+  toast(n==="NotAllowedError"||n==="SecurityError"?"Permission denied. Allow microphone/camera in your browser site settings.":n==="NotFoundError"?"No microphone found on this device.":n==="NotReadableError"?"Mic/camera is being used by another app. Close it and retry.":"Cannot access mic/camera: "+n);
+  return null;
 }
+
 function setupPc(id,side){
- const pc=new RTCPeerConnection({iceServers:ICE,iceCandidatePoolSize:0});
- const queue=[];call.pc=pc;call.queuedCandidates=queue;call.flushICE=()=>{if(!pc.remoteDescription||!queue.length)return;const next=queue.splice(0);next.forEach(candidate=>{if(!candidate)return;pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{})})};
- call.stream.getTracks().forEach(track=>pc.addTrack(track,call.stream));
- pc.ontrack=e=>{const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([e.track]);$("rv").srcObject=stream;$("rv").muted=false;$("rv").autoplay=true;$("rv").playsInline=true;$("rv").play?.().catch(()=>{})};
- pc.onicecandidate=e=>{if(!e.candidate||!call||call.id!==id)return;const refI=push(ref(rtdb,`calls/${id}/ice/${side}`));set(refI,e.candidate.toJSON()).catch(()=>{})};
- pc.onconnectionstatechange=()=>{const s=pc.connectionState;if(!call||call.id!==id)return;const label=callStateLabels[s]||s;$("cstat").textContent=label;
-  if(s==="connecting"||s==="checking"){updateCallStateOnDb(id,"connecting").catch(()=>{})}
-  if(s==="connected"){if(!call.t0){call.t0=Date.now();beginCallTimer();}updateCallStateOnDb(id,"connected").catch(()=>{})}
-  if(s==="failed"||s==="disconnected"||s==="closed"){endCall("Connection lost. Direct P2P could not stay stable on this network.",true,"disconnected");}
- };
- const remoteSide=side==="caller"?"callee":"caller";
- call.unsubs.push(onChildAdded(ref(rtdb,`calls/${id}/ice/${remoteSide}`),s=>{const candidate=s.val();if(!candidate)return;if(pc.remoteDescription){pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{})}else{queue.push(candidate)}}));
- call.unsubs.push(onValue(ref(rtdb,`calls/${id}/state`),s=>{const v=s.val();if(!v||!["rejected","ended","missed","busy","failed","cancelled","disconnected"].includes(v))return;const reason=v==="rejected"?"Call rejected.":v==="missed"?"No answer.":v==="busy"?"User is busy.":v==="cancelled"?"Call cancelled.":v==="disconnected"?"Connection lost.":"Call ended.";endCall(reason,false,v)}));
+  const pc=new RTCPeerConnection({iceServers:ICE,iceCandidatePoolSize:0});
+  const queue=[];
+  call.pc=pc;
+  call.queuedCandidates=queue;
+  call.flushICE=()=>{if(!pc.remoteDescription||!queue.length)return;const next=queue.splice(0);next.forEach(candidate=>{if(!candidate)return;pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{})})};
+  call.stream.getTracks().forEach(track=>pc.addTrack(track,call.stream));
+  pc.ontrack=e=>{const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([e.track]);$("rv").srcObject=stream;$("rv").muted=false;$("rv").autoplay=true;$("rv").playsInline=true;$("rv").play?.().catch(()=>{})};
+  pc.onicecandidate=e=>{if(!e.candidate||!call||call.id!==id)return;const refI=push(ref(rtdb,`calls/${id}/ice/${side}`));set(refI,e.candidate.toJSON()).catch(()=>{})};
+  pc.onconnectionstatechange=()=>{const s=pc.connectionState;if(!call||call.id!==id)return;const label=callStateLabels[s]||s;$("cstat").textContent=label;
+    if(s==="connecting"||s==="checking"){updateCallStateOnDb(id,"connecting").catch(()=>{})}
+    if(s==="connected"){if(!call.t0){call.t0=Date.now();beginCallTimer();}updateCallStateOnDb(id,"connected").catch(()=>{})}
+    if(s==="failed"||s==="disconnected"||s==="closed"){endCall("Connection lost. Direct P2P could not stay stable on this network.",true,"disconnected");}
+  };
+  const remoteSide=side==="caller"?"callee":"caller";
+  call.unsubs.push(onChildAdded(ref(rtdb,`calls/${id}/ice/${remoteSide}`),s=>{const candidate=s.val();if(!candidate)return;if(pc.remoteDescription){pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{})}else{queue.push(candidate)}}));
+  call.unsubs.push(onValue(ref(rtdb,`calls/${id}/state`),s=>{const v=s.val();if(!v||!["rejected","ended","missed","busy","failed","cancelled","disconnected"].includes(v))return;const reason=v==="rejected"?"Call rejected.":v==="missed"?"No answer.":v==="busy"?"User is busy.":v==="cancelled"?"Call cancelled.":v==="disconnected"?"Connection lost.":"Call ended.";endCall(reason,false,v)}));
 }
+
 async function startCall(video){
   if(!peer)return toast("Open a conversation first.");
   if(blocked.has(peer.uid))return toast("You blocked this user. Unblock to call.");

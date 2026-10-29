@@ -1,0 +1,80 @@
+{
+  "rules": {
+    "status": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('privacy').child($uid).child('online').val() !== 'nobody')",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['connections', 'lastSeen']) || !newData.exists()",
+        "connections": {
+          ".validate": "newData.isBoolean() || newData.val() === null"
+        },
+        "lastSeen": {
+          ".validate": "newData.isNumber() || newData.val() === null"
+        }
+      }
+    },
+    "privacy": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "online": {
+          ".validate": "newData.val() === 'everyone' || newData.val() === 'nobody'"
+        },
+        "lastSeen": {
+          ".validate": "newData.val() === 'everyone' || newData.val() === 'nobody'"
+        }
+      }
+    },
+    "blocks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "$blockedUid": {
+          ".validate": "newData.isBoolean() || !newData.exists()"
+        }
+      }
+    },
+    "typing": {
+      "$cid": {
+        ".read": "auth != null && $cid.contains(auth.uid)",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && $cid.contains(auth.uid)",
+          ".validate": "newData.isBoolean() || !newData.exists()"
+        }
+      }
+    },
+    "incoming": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || (newData.child('from').val() === auth.uid && !root.child('blocks').child($uid).child(auth.uid).exists() && !root.child('blocks').child(auth.uid).child($uid).exists()) || (!newData.exists() && data.child('from').val() === auth.uid))"
+      }
+    },
+    "calls": {
+      "$id": {
+        ".read": "auth != null && (data.child('from').val() === auth.uid || data.child('to').val() === auth.uid)",
+        ".write": "auth != null && ((!data.exists() && newData.child('from').val() === auth.uid && !root.child('blocks').child(newData.child('to').val()).child(auth.uid).exists() && !root.child('blocks').child(auth.uid).child(newData.child('to').val()).exists()) || data.child('from').val() === auth.uid || data.child('to').val() === auth.uid)",
+        ".validate": "newData.hasChildren(['from','to','state','createdAt']) || !newData.exists()",
+        "from": { ".validate": "newData.isString() && newData.val().length > 0" },
+        "to": { ".validate": "newData.isString() && newData.val().length > 0" },
+        "state": { ".validate": "newData.isString()" },
+        "createdAt": { ".validate": "newData.isNumber() || newData.val() === null" }
+      }
+    },
+    "rooms": {
+      "$room": {
+        "members": {
+          ".read": "auth != null && data.child(auth.uid).exists()",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "sig": {
+          "$pair": {
+            ".read": "auth != null && $pair.contains(auth.uid) && root.child('rooms').child($room).child('members').child(auth.uid).exists()",
+            ".write": "auth != null && $pair.contains(auth.uid) && root.child('rooms').child($room).child('members').child(auth.uid).exists()"
+          }
+        }
+      }
+    }
+  }
+}

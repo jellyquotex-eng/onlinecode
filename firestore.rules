@@ -1,0 +1,282 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function hasNoBlockBetween(a, b) {
+      return !exists(/databases/$(database)/documents/blocks/$(a)/users/$(b))
+        && !exists(/databases/$(database)/documents/blocks/$(b)/users/$(a));
+    }
+    function isPostReadable(postData) {
+      return signedIn()
+        && !exists(/databases/$(database)/documents/blocks/$(request.auth.uid)/users/$(postData.uid))
+        && !exists(/databases/$(database)/documents/blocks/$(postData.uid)/users/$(request.auth.uid))
+        && (
+          postData.uid == request.auth.uid ||
+          postData.visibility != 'private' ||
+          exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + postData.uid)) ||
+          exists(/databases/$(database)/documents/follows/$(postData.uid + '_' + request.auth.uid))
+        );
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.keys().hasOnly(['uid','username','usernameLower','nickname','nicknameLower','photoURL','coverURL','bio','createdAt'])
+        && request.resource.data.username.matches('^[a-z0-9_]{3,20}$')
+        && request.resource.data.usernameLower == request.resource.data.username
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 1 && request.resource.data.nickname.size() <= 40
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','usernameLower','nickname','nicknameLower','photoURL','coverURL','bio'])
+        && request.resource.data.username.matches('^[a-z0-9_]{3,20}$')
+        && request.resource.data.usernameLower == request.resource.data.username
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 1 && request.resource.data.nickname.size() <= 40;
+      allow update: if isAdmin()
+        && request.resource.data.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verified','verifiedAt','verificationStatus'])
+        && request.resource.data.verified is bool
+        && request.resource.data.verificationStatus in ['pending','approved','rejected'];
+      allow delete: if false;
+    }
+
+    match /usernames/{name} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid && name.matches('^[a-z0-9_]{3,20}$');
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /privacy/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /blocks/{blocker}/users/{blockedUid} {
+      allow read, write: if signedIn() && request.auth.uid == blocker;
+    }
+
+    match /friendRequests/{id} {
+      allow read: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['from','to','status','createdAt'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to != request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.to
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn()
+        && resource.data.to == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'accepted';
+      allow delete: if signedIn() && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+    }
+
+    match /callLog/{uid}/items/{id} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /reports/{rid} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['reporter','reported','reason','description','createdAt'])
+        && request.resource.data.reporter == request.auth.uid
+        && request.resource.data.reported != request.auth.uid
+        && rid == request.auth.uid + '_' + request.resource.data.reported
+        && request.resource.data.reason in ['Spam','Harassment','Fake Account','Inappropriate Content','Impersonation','Other']
+        && request.resource.data.description.size() <= 500
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
+
+    match /follows/{followId} {
+      allow read: if signedIn() && (resource.data.followerUid == request.auth.uid || resource.data.followeeUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['followerUid','followeeUid','createdAt'])
+        && request.resource.data.followerUid == request.auth.uid
+        && request.resource.data.followeeUid != request.auth.uid
+        && hasNoBlockBetween(request.auth.uid, request.resource.data.followeeUid)
+        && request.resource.data.createdAt == request.time
+        && followId == request.resource.data.followerUid + '_' + request.resource.data.followeeUid;
+      allow update: if false;
+      allow delete: if signedIn() && (resource.data.followerUid == request.auth.uid || resource.data.followeeUid == request.auth.uid);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.toUid == request.auth.uid;
+      allow create: if false;
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+      allow delete: if false;
+    }
+
+    match /verificationApplications/{appId} {
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['uid','fullName','age','username','profileLink','reason','extra','status','createdAt'])
+        && request.resource.data.fullName is string && request.resource.data.fullName.size() >= 2 && request.resource.data.fullName.size() <= 80
+        && request.resource.data.age is number && request.resource.data.age >= 13 && request.resource.data.age <= 120
+        && request.resource.data.reason is string && request.resource.data.reason.size() >= 10 && request.resource.data.reason.size() <= 500
+        && request.resource.data.createdAt == request.time;
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAdmin()
+        && request.resource.data.status in ['approved','rejected']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt'])
+        && request.resource.data.reviewedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /posts/{postId} {
+      allow read: if signedIn() && isPostReadable(resource.data);
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid','authorName','authorUsername','authorPhoto','content','image','createdAt','updatedAt','likesCount','commentsCount','viewsCount','viewedBy','reactionCounts','verified','visibility'])
+        && request.resource.data.authorName is string
+        && request.resource.data.authorUsername is string
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.likesCount == 0
+        && request.resource.data.commentsCount == 0
+        && request.resource.data.viewsCount == 0
+        && request.resource.data.viewedBy is list
+        && request.resource.data.viewedBy.size() == 0
+        && request.resource.data.reactionCounts is map
+        && request.resource.data.reactionCounts.keys().hasOnly(['like','love','haha','wow','sad','angry'])
+        && request.resource.data.verified == false
+        && (!('visibility' in request.resource.data) || request.resource.data.visibility in ['public','private'])
+        && (!('image' in request.resource.data) || request.resource.data.image is string);
+      allow update: if signedIn()
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.authorUsername == resource.data.authorUsername
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.verified == resource.data.verified
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content','image','updatedAt','likesCount','commentsCount','viewsCount','viewedBy','reactionCounts','visibility'])
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.reactionCounts.keys().hasOnly(['like','love','haha','wow','sad','angry'])
+        && request.auth.uid == resource.data.uid;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /postLikes/{likeId} {
+      allow read: if signedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin() ||
+        isPostReadable(get(/databases/$(database)/documents/posts/$(resource.data.postId)).data)
+      );
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.createdAt == request.time
+        && likeId == request.resource.data.postId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/posts/$(request.resource.data.postId))
+        && isPostReadable(get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data);
+      allow update: if false;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin() || get(/databases/$(database)/documents/posts/$(resource.data.postId)).data.uid == request.auth.uid);
+    }
+
+    match /postReactions/{reactionId} {
+      allow read: if signedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin() ||
+        isPostReadable(get(/databases/$(database)/documents/posts/$(resource.data.postId)).data)
+      );
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.reaction in ['like','love','haha','wow','sad','angry']
+        && request.resource.data.createdAt == request.time
+        && reactionId == request.resource.data.postId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/posts/$(request.resource.data.postId))
+        && isPostReadable(get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data);
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reaction','updatedAt'])
+        && request.resource.data.reaction in ['like','love','haha','wow','sad','angry'];
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin() || get(/databases/$(database)/documents/posts/$(resource.data.postId)).data.uid == request.auth.uid);
+    }
+
+    match /postComments/{commentId} {
+      allow read: if signedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin() ||
+        isPostReadable(get(/databases/$(database)/documents/posts/$(resource.data.postId)).data)
+      );
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.content is string
+        && request.resource.data.content.size() >= 1 && request.resource.data.content.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && (!('parentId' in request.resource.data) || request.resource.data.parentId is string || request.resource.data.parentId == null)
+        && exists(/databases/$(database)/documents/posts/$(request.resource.data.postId))
+        && isPostReadable(get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data);
+      allow update: if signedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin()
+      ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content','updatedAt'])
+        && request.resource.data.content.size() >= 1 && request.resource.data.content.size() <= 1000;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin() || get(/databases/$(database)/documents/posts/$(resource.data.postId)).data.uid == request.auth.uid);
+    }
+
+    match /postViews/{viewId} {
+      allow read: if signedIn() && (
+        resource.data.uid == request.auth.uid ||
+        isAdmin() ||
+        isPostReadable(get(/databases/$(database)/documents/posts/$(resource.data.postId)).data)
+      );
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.createdAt == request.time
+        && viewId == request.resource.data.postId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/posts/$(request.resource.data.postId))
+        && isPostReadable(get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data);
+      allow update: if false;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /conversations/{cid} {
+      allow read, update: if signedIn() && request.auth.uid in resource.data.participants;
+      allow create: if signedIn() && request.auth.uid in request.resource.data.participants
+                    && request.resource.data.participants.size() == 2 && !exists(/databases/$(database)/documents/blocks/$(request.auth.uid)/users/$(request.resource.data.participants[0] == request.auth.uid ? request.resource.data.participants[1] : request.resource.data.participants[0]))
+                    && !exists(/databases/$(database)/documents/blocks/$(request.resource.data.participants[0] == request.auth.uid ? request.resource.data.participants[1] : request.resource.data.participants[0])/users/$(request.auth.uid));
+      match /messages/{mid} {
+        function isMember() { return request.auth.uid in get(/databases/$(database)/documents/conversations/$(cid)).data.participants; }
+        allow read: if signedIn() && isMember();
+        allow create: if signedIn() && isMember() && request.resource.data.from == request.auth.uid
+          && (!('replyTo' in request.resource.data) || (
+                request.resource.data.replyTo is string
+                && request.resource.data.replyPreview is map
+                && request.resource.data.replyPreview.text is string
+                && request.resource.data.replyPreview.text.size() <= 200))
+          && !exists(/databases/$(database)/documents/blocks/$(request.auth.uid)/users/$(get(/databases/$(database)/documents/conversations/$(cid)).data.participants[0] == request.auth.uid ? get(/databases/$(database)/documents/conversations/$(cid)).data.participants[1] : get(/databases/$(database)/documents/conversations/$(cid)).data.participants[0]))
+          && !exists(/databases/$(database)/documents/blocks/$(get(/databases/$(database)/documents/conversations/$(cid)).data.participants[0] == request.auth.uid ? get(/databases/$(database)/documents/conversations/$(cid)).data.participants[1] : get(/databases/$(database)/documents/conversations/$(cid)).data.participants[0])/users/$(request.auth.uid));
+        allow update: if signedIn() && isMember() && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenBy'])
+            && get(/databases/$(database)/documents/privacy/$(request.auth.uid)).data.readReceipts == true
+            && request.resource.data.seenBy.toSet().difference(resource.data.seenBy.toSet()).hasOnly([request.auth.uid])) ||
+          (resource.data.from == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text','edited'])) ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+            && request.resource.data.deletedFor.hasAll(resource.data.get('deletedFor', []))
+            && request.resource.data.deletedFor.toSet().difference(resource.data.get('deletedFor', []).toSet()).hasOnly([request.auth.uid])) ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid])
+            && request.resource.data.reactions.get(request.auth.uid, '🎉') in ['❤️','😂','😮','😢','👍','👎','🔥','🎉']));
+        allow delete: if signedIn() && resource.data.from == request.auth.uid;
+      }
+    }
+  }
+}

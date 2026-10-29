@@ -992,28 +992,12 @@ async function addComment(postId, text){ if(!me) return; const parentId = docume
 async function markPostViewed(postId, authorUid){if(!me || authorUid===me.uid) return; const postRef = doc(db,"posts",postId); const viewRef = doc(db,"postViews",`${postId}_${me.uid}`); const existing = await getDoc(viewRef); if(existing.exists()) return; await runTransaction(db, async tx => { const snap = await tx.get(postRef); if(!snap.exists()) return; const viewedBy = snap.data().viewedBy || []; if(viewedBy.includes(me.uid)) return; tx.update(postRef,{viewsCount: increment(1), viewedBy: [...viewedBy, me.uid]}); tx.set(viewRef,{postId, uid:me.uid, createdAt:serverTimestamp()}); }); }
 async function setPostViewTracking(postId, authorUid){ await markPostViewed(postId, authorUid); renderFeed(); }
 
-function fireAdminCheck(){ if(!auth.currentUser) return false; return !!auth.currentUser.getIdTokenResult && auth.currentUser.getIdTokenResult(); }
 async function openAdminPanel(){ const panel = $("admin-panel"); const notice = $("admin-access"); const content = $("admin-content"); panel.hidden = false; notice.hidden = true; content.hidden = true; try{ const user = auth.currentUser; if(!user){ notice.hidden = false; notice.textContent = "Please sign in to check admin access."; return; } const claims = await user.getIdTokenResult(); const isAdmin = !!claims.claims?.admin; if(!isAdmin){ notice.hidden = false; notice.textContent = "Admin access is not configured on this project. Secure admin authorization requires Firebase custom claims or a trusted backend/server role. The shortcut only opens this panel; it is not a security mechanism."; return; } content.hidden = false; const totalUsersSnap = await getDocs(collection(db,"users")); $("admin-total-users").textContent = totalUsersSnap.size; const totalPostsSnap = await getDocs(collection(db,"posts")); $("admin-total-posts").textContent = totalPostsSnap.size; const pendingSnap = await getDocs(query(collection(db,"verificationApplications"), where("status","==","pending"))); $("admin-pending-verifications").textContent = pendingSnap.size; const appList = $("admin-app-list"); const appsSnap = await getDocs(query(collection(db,"verificationApplications"), orderBy("createdAt","desc"))); if(appsSnap.empty){ appList.innerHTML = '<p class="soon">No verification applications yet.</p>'; return; } appList.innerHTML = '<table class="admin-table"><thead><tr><th>Name</th><th>Age</th><th>Username</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody></tbody></table>'; const rows = appList.querySelector('tbody'); appsSnap.docs.forEach(docSnap => { const app = docSnap.data(); const author = cache[app.uid] || {nickname: app.username || "User", username: app.username || ""}; const row = document.createElement('tr'); row.innerHTML = `<td>${escapeHtml(app.fullName || author.nickname || "Unknown")}</td><td>${escapeHtml(app.age ?? "")}</td><td>@${escapeHtml(app.username || author.username || "")}</td><td>${escapeHtml((app.reason || "").slice(0,120))}</td><td>${escapeHtml(app.status || "pending")}</td><td class="admin-actions"><button class="ghost sm" data-approve="${docSnap.id}" type="button">Approve</button><button class="ghost sm" data-reject="${docSnap.id}" type="button">Reject</button></td>`; row.querySelector('[data-approve]').onclick = async () => { await approveVerification(docSnap.id, app.uid); await openAdminPanel(); }; row.querySelector('[data-reject]').onclick = async () => { await rejectVerification(docSnap.id, app.uid); await openAdminPanel(); }; rows.appendChild(row); }); } catch (err){ notice.hidden = false; notice.textContent = "Admin access check failed: " + (err?.message || err?.code || "Unknown error"); }}
 function closeAdminPanel(){ $("admin-panel").hidden = true; }
 $("admin-close").onclick = closeAdminPanel;
 async function approveVerification(appId, uid){ const appRef = doc(db,"verificationApplications",appId); const appSnap = await getDoc(appRef); if(!appSnap.exists()) return; await updateDoc(appRef,{status:"approved", reviewedAt:serverTimestamp()}); await updateDoc(doc(db,"users",uid),{verified:true, verifiedAt:serverTimestamp(), verificationStatus:"approved"}); toast("Verification approved.",1); }
 async function rejectVerification(appId, uid){ const appRef = doc(db,"verificationApplications",appId); await updateDoc(appRef,{status:"rejected", reviewedAt:serverTimestamp()}); await updateDoc(doc(db,"users",uid),{verified:false, verificationStatus:"rejected"}); toast("Verification rejected.",1); }
 $("pf-verify").onclick = () => openVerificationModal();
-let pKeyTimer = 0, isTypingField = false;
-document.addEventListener("keydown", event => {
-  const tag = event.target && (event.target.tagName || ""); const inEditor = tag === "INPUT" || tag === "TEXTAREA" || event.target.isContentEditable || tag === "SELECT";
-  if (inEditor) return;
-  if (event.key.toLowerCase() === "p") {
-    const now = Date.now();
-    if (now - pKeyTimer < 300) {
-      event.preventDefault();
-      openAdminPanel();
-      pKeyTimer = 0;
-    } else {
-      pKeyTimer = now;
-    }
-  }
-});
 
 async function initSocialSystems(){
   if(!me)return;

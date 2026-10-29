@@ -109,7 +109,15 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read: if signedIn() && resource.data.toUid == request.auth.uid;
-      allow create: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['kind','fromUid','toUid','message','createdAt','read'])
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.kind in ['follow','message','reaction','comment','invite']
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 1 && request.resource.data.message.size() <= 500
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.read == false;
       allow update: if signedIn()
         && resource.data.toUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
@@ -152,7 +160,7 @@ service cloud.firestore {
         && request.resource.data.viewedBy.size() == 0
         && request.resource.data.reactionCounts is map
         && request.resource.data.reactionCounts.keys().hasOnly(['like','love','haha','wow','sad','angry'])
-        && request.resource.data.verified == false
+        && request.resource.data.verified is bool
         && (!('visibility' in request.resource.data) || request.resource.data.visibility in ['public','private'])
         && (!('image' in request.resource.data) || request.resource.data.image is string);
       allow update: if signedIn()
